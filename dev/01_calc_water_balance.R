@@ -20,24 +20,26 @@
 
 ## ----------------------------------Load packages---------------------------------------##
 library(tidyverse)
-library(rvest)
-library(tictoc)
+#library(rvest)
+#library(tictoc)
 library(furrr)
 library(sf)
-library(sp)
+#library(sp)
 library(leaflet)
+library(htmlwidgets)
 
 ## --------------------------------------------------------------------------------------##
 
 #proj_url = "https://wepp.cloud/weppcloud/runs/lt_202012_26_Bliss_Creek_CurCond/lt-wepp_bd16b69-snow/"
+args = commandArgs(trailingOnly=TRUE)
 
-proj_runid = "lt-wepp_bd16b69-snow"
+proj_runid = args[1] #"lt_202012_26_Bliss_Creek_CurCond"
 
 ## -----------------------------------Functions-----------------------------------------##
 
 gethillwatfiles<- function(runid){
   link <- paste0("/geodata/weppcloud_runs/", runid,"/wepp/output/")
-  wat_dat <- list.files(link, "*\\.wat.dat$")
+  wat_dat <- list.files(link, "*\\.wat.dat$", full.names=TRUE)
   return(wat_dat)
 }
 
@@ -75,8 +77,9 @@ get_geometry <- function(runid){
 
 ## --------------------------------------------------------------------------------------##
 ## Definitely a faster alternative on linux--- tested out in WSL ubuntu
-tictoc::tic()
+#tictoc::tic()
 watfilepaths <- gethillwatfiles(proj_runid)
+
 future::plan(multisession, workers = 6)
 watbal<- furrr::future_map(watfilepaths, calc_watbal)%>%
   dplyr::bind_rows() %>%    
@@ -84,7 +87,7 @@ watbal<- furrr::future_map(watfilepaths, calc_watbal)%>%
   tidyr::unnest(cols = c("wb", "WeppID"))
 shp <- get_geometry(proj_runid)
 Hwatbal_spdf = dplyr::left_join(shp, watbal)
-tictoc::toc()
+#tictoc::toc()
 
 
 ## --------------------------------------------------------------------------------------##
@@ -92,7 +95,7 @@ tictoc::toc()
 
 pal <- leaflet::colorNumeric("viridis", domain = Hwatbal_spdf$wb)
 
-leaflet::leaflet(Hwatbal_spdf) %>%
+map <- leaflet::leaflet(Hwatbal_spdf) %>%
   leaflet::addProviderTiles(leaflet::providers$Esri.WorldTopoMap) %>%
   leaflet::addPolygons(fillColor = ~pal(wb),
                        weight = 2,
@@ -110,3 +113,6 @@ leaflet::leaflet(Hwatbal_spdf) %>%
                          fillOpacity = 0.7,
                          bringToFront = TRUE))%>% leaflet::addLegend(pal = pal,
                                                                      values = ~wb)
+file <- paste0("/geodata/weppcloud_runs/", proj_runid,"/export/viz/wat_bal.htm")
+htmlwidgets::saveWidget(map, file, selfcontained=TRUE)
+
