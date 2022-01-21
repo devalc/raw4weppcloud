@@ -1,0 +1,39 @@
+#add the relevant GPG key using:
+
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+
+
+#Find appropriate repository for the ubuntu version at : https://cloud.r-project.org/bin/linux/ubuntu/ then run follwing using that repository link:
+
+sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
+
+#update everything.
+
+sudo apt update
+
+# install R
+
+sudo apt install r-base
+
+sudo apt install build-essential libcurl4-gnutls-dev libxml2-dev libssl-dev
+
+# Run this command to get into R and install packages for all users:
+
+sudo -i R
+
+
+# Install packages from CRAN using:
+
+install.packages('packageName')
+
+
+## sf will most likely throw error. To fix install following bindings
+
+ sudo apt install -y libudunits2-0 libudunits2-dev
+ 
+ sudo apt install libgdal-dev
+ 
+ ## Same with rgdal and rgeos. First install additional libraries to compile gdal and then install rgdal
+ 
+ sudo apt-get install libgdal-dev libproj-dev libgeos++dev
+ install.packages('rgdal')

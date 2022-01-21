@@ -1,0 +1,83 @@
+---
+title: "`r paste0('A report Generated for a WEPPcloud run')`"
+date: "`r Sys.Date()`"
+output: html_document
+params:
+  proj_url: 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(plotly)
+library(furrr)
+
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+gethillwatfiles<- function(link){
+  link <- paste0(link,"browse/wepp/output/")
+  pg <- rvest::read_html(link)
+  wat_dat <- rvest::html_attr(rvest::html_nodes(pg, "a"), "href") %>%
+    stringr::str_subset(".wat.dat", negate = FALSE)
+  wat_dat <- paste0(link, wat_dat)
+  return(wat_dat)
+  
+}
+
+calc_watbal <- function(link){
+  a <- read.table(link, skip = 23,
+                  col.names = c("OFE",	"J",	"Y",	"P",	"RM",	"Q",	"Ep",	"Es",
+                                "Er",	"Dp",	"UpStrmQ",	"SubRIn",	"latqcc",
+                                "Total_Soil_Water",	"frozwt",	"Snow_Water",	"QOFE",
+                                "Tile",	"Irr",	"Area")) %>%
+    dplyr::mutate_if(is.character,as.numeric)
+  
+  
+  a <- a %>%  dplyr::mutate(wb = P-Q-Ep - Es- Er - Dp - latqcc +
+                              dplyr::lag(Total_Soil_Water) - Total_Soil_Water +
+                              dplyr::lag(frozwt) - frozwt+ dplyr::lag(Snow_Water) - Snow_Water) %>%
+    dplyr::mutate(dplyr::across(where(is.numeric), round, 3)) %>% dplyr::select(wb) %>%
+    dplyr::summarise_all(.funs = sum, na.rm = TRUE) %>%
+    dplyr::mutate(WeppID =readr::parse_number(gsub("^.*/", "", link)))
+  
+  return(as.data.frame(a))
+}
+
+```
+
+```{r echo=FALSE}
+paste0("my project is:", params$proj_url)
+
+watfilepaths <- gethillwatfiles(params$proj_url)
+future::plan(multisession, workers = 6)
+watbal<- furrr::future_map(watfilepaths, calc_watbal)%>%
+  dplyr::bind_rows() %>%    
+  dplyr::mutate_if(is.list, purrr::simplify_all) %>%  
+  tidyr::unnest(cols = c("wb", "WeppID"))
+
+```
+
+
+## Water Balance Error Plot:
+```{r echo=FALSE}
+p<-ggplot(data=watbal, aes(x=reorder(WeppID, wb), y=wb)) +
+  geom_bar(stat="identity")+ coord_flip() + xlab("WeppID") +ggthemes::theme_solarized()
+p
+```
+
+```{r, echo=FALSE}
+summary(watbal)
+```
+
+<!-- "https://wepp.cloud/weppcloud/runs/lt_202012_26_Bliss_Creek_CurCond/lt-wepp_bd16b69-snow/" -->
