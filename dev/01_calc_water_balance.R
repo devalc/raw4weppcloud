@@ -29,18 +29,16 @@ library(leaflet)
 
 ## --------------------------------------------------------------------------------------##
 
-proj_url = "https://wepp.cloud/weppcloud/runs/lt_202012_26_Bliss_Creek_CurCond/lt-wepp_bd16b69-snow/"
+#proj_url = "https://wepp.cloud/weppcloud/runs/lt_202012_26_Bliss_Creek_CurCond/lt-wepp_bd16b69-snow/"
+
+proj_runid = "lt-wepp_bd16b69-snow"
 
 ## -----------------------------------Functions-----------------------------------------##
 
-gethillwatfiles<- function(link){
-  link <- paste0(link,"browse/wepp/output/")
-  pg <- rvest::read_html(link)
-  wat_dat <- rvest::html_attr(rvest::html_nodes(pg, "a"), "href") %>%
-    stringr::str_subset(".wat.dat", negate = FALSE)
-  wat_dat <- paste0(link, wat_dat)
+gethillwatfiles<- function(runid){
+  link <- paste0("/geodata/weppcloud_runs/", runid,"/wepp/output/")
+  wat_dat <- list.files(link, "*\\.wat.dat$")
   return(wat_dat)
-  
 }
 
 calc_watbal <- function(link){
@@ -62,9 +60,8 @@ calc_watbal <- function(link){
   return(as.data.frame(a))
 }
 
-
-get_geometry <- function(link){
-  link <- paste0(link,"browse/export/arcmap/subcatchments.json")
+get_geometry <- function(runid){
+  link <- paste0("/geodata/weppcloud_runs/", runid,"/export/arcmap/subcatchments.json")
   geometry <- sf::st_read(link)%>%
     dplyr::select(WeppID, geometry) %>%
     sf::st_transform(4326) %>%
@@ -79,13 +76,13 @@ get_geometry <- function(link){
 ## --------------------------------------------------------------------------------------##
 ## Definitely a faster alternative on linux--- tested out in WSL ubuntu
 tictoc::tic()
-watfilepaths <- gethillwatfiles(proj_url)
+watfilepaths <- gethillwatfiles(proj_runid)
 future::plan(multisession, workers = 6)
 watbal<- furrr::future_map(watfilepaths, calc_watbal)%>%
   dplyr::bind_rows() %>%    
   dplyr::mutate_if(is.list, purrr::simplify_all) %>%  
   tidyr::unnest(cols = c("wb", "WeppID"))
-shp <- get_geometry(proj_url)
+shp <- get_geometry(proj_runid)
 Hwatbal_spdf = dplyr::left_join(shp, watbal)
 tictoc::toc()
 
