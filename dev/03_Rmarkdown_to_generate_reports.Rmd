@@ -9,8 +9,7 @@ output:
     toc: true
     toc_float: true
 params:
-  proj_runid: "https://wepp.cloud/weppcloud/runs/lt_202012_26_Bliss_Creek_CurCond/lt-wepp_bd16b69-snow/"
-
+  proj_runid: default 
 ---
 
 ```{r setup, include=FALSE}
@@ -30,7 +29,7 @@ library(cleanrmd, quietly = TRUE)
 library(echarts4r, quietly = TRUE)
 library(DT, quietly = TRUE)
 library(leaflet, quietly = TRUE)
-library(crosstalk, quietly = TRUE)
+library(data.table, quietly = TRUE)
 
 
 ```
@@ -41,14 +40,10 @@ library(crosstalk, quietly = TRUE)
 
 ```{r, echo=FALSE}
 ### spdf
-gethillwatfiles<- function(link){
-  link <- paste0(link,"browse/wepp/output/")
-  pg <- rvest::read_html(link)
-  wat_dat <- rvest::html_attr(rvest::html_nodes(pg, "a"), "href") %>%
-    stringr::str_subset(".wat.dat", negate = FALSE)
-  wat_dat <- paste0(link, wat_dat)
+gethillwatfiles<- function(runid){
+  link <- paste0("/geodata/weppcloud_runs/", runid,"/wepp/output/")
+  wat_dat <- list.files(link, "*\\.wat.dat$", full.names=TRUE)
   return(wat_dat)
-  
 }
 
 calc_watbal <- function(link){
@@ -71,7 +66,7 @@ calc_watbal <- function(link){
 }
 
 get_geometry <- function(runid){
-  link <- paste0(params$proj_runid,"browse/export/arcmap/subcatchments.json")
+  link <- paste0("/geodata/weppcloud_runs/", params$proj_runid, "/export/arcmap/subcatchments.json")
   geometry <- sf::st_read(link,quiet = TRUE)%>%
     dplyr::select(WeppID, geometry) %>%
     sf::st_transform(4326) %>%
@@ -139,8 +134,9 @@ process_chanwb <- function(chanwb_path, Wshed_Area_m2){
 
 ```{r, echo=FALSE}
 wshed_area_m2= get_WatershedArea_m2(paste0(
+          "/geodata/weppcloud_runs/",
           params$proj_runid,
-          "browse/wepp/output/",
+          "/wepp/output/",
           "loss_pw0.txt"
         ))
 ```
@@ -193,7 +189,7 @@ process_ebe <- function(ebe_path, yr_start, yr_end){
 ```{r echo=FALSE,message=FALSE,warning=FALSE}
 ### totalwatsed
 
-totalwatseddf <- data.table::fread(paste0(params$proj_runid,"resources/wepp/totalwatsed.csv"))
+totalwatseddf <- data.table::fread(paste0("/geodata/weppcloud_runs/", params$proj_runid, "/export/totalwatsed.csv"))
 
 ```
 
@@ -270,8 +266,9 @@ totalwatsed_wbal= totalwatsed_wbal %>%
 
 ```{r, echo=FALSE}
 chanwb = process_chanwb(
-                  paste0(params$proj_runid,
-                      "browse/wepp/output/",
+                  paste0("/geodata/weppcloud_runs/",
+                      params$proj_runid,
+                      "/wepp/output/",
                       "chanwb.out"
                   ),
                   wshed_area_m2
@@ -293,9 +290,9 @@ yr_max= as.character(max(unique(chanwb$Year_chan)))
 ```
 
 ```{r, echo=FALSE}
-ebe = process_ebe(paste0(
+ebe = process_ebe(paste0("/geodata/weppcloud_runs/",
                       params$proj_runid,
-                      "browse/wepp/output/",
+                      "/wepp/output/",
                       "ebe_pw0.txt"
                   ),
                   yr_min,
